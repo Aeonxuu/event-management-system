@@ -11,9 +11,10 @@ This checklist validates the School Event Management System MVP end to end again
 
 ## 2. Start App
 
-1. Run `npm run dev`.
-2. Open `http://localhost:3000`.
-3. Confirm redirect to `/login`.
+1. Run `npm run dev:server` (Express API on port 3001) in one terminal.
+2. Run `npm run dev` (Next.js UI on port 3000) in another terminal.
+3. Open `http://localhost:3000`.
+4. Confirm redirect to `/login`.
 
 ## 3. Authentication
 
@@ -89,3 +90,91 @@ This checklist validates the School Event Management System MVP end to end again
    - Draft -> Submit -> Sequential approvals -> Approved
 3. Audit trail records all transitions.
 4. No out-of-scope features introduced (email, uploads, websockets, realtime).
+
+## Run & Test (Express backend + Next.js frontend)
+
+**Note:** The backend has been migrated to Express.js. MongoDB must be running and `.env.local` must be configured before starting.
+
+### Prerequisites
+
+1. **MongoDB running** (local or Docker):
+   ```bash
+   docker run --name mongo-school-ems -p 27017:27017 -d mongo:6
+   ```
+
+2. **`.env.local` configured** in `school-ems-mvp/` folder:
+   ```
+   MONGODB_URI=mongodb://localhost:27017/school-ems-mvp
+   JWT_SECRET=replace_with_a_secure_secret_at_least_16_chars
+   JWT_EXPIRES_IN=7d
+   AUTH_COOKIE_NAME=school_ems_token
+   APP_URL=http://localhost:3000
+   EXPRESS_PORT=3001
+   ```
+
+3. **Dependencies installed and demo data seeded** (run from `school-ems-mvp/`):
+   ```bash
+   npm install
+   npm run seed:demo
+   ```
+
+### Demo Accounts
+
+All demo accounts use password: **`demo123`**
+
+| Email | Role | Purpose |
+|-------|------|---------|
+| `student.dsc@school.demo` | Student Leader | Create and submit events |
+| `student.mastech@school.demo` | Student Leader | Create and submit events |
+| `adviser@school.demo` | Adviser | First approver in workflow |
+| `dean@school.demo` | Dean | Second approver in workflow |
+| `facilities@school.demo` | Facilities | Third approver in workflow |
+| `osa@school.demo` | OSA | Fourth approver in workflow |
+| `admin@school.demo` | Admin | Manage users, venues, organizations |
+
+### Starting the Servers
+
+Run these commands in **separate terminal windows** from the `school-ems-mvp/` folder:
+
+**Terminal 1 — Start Express API** (port 3001):
+```bash
+npm run dev:server
+```
+Output should include: `Express server listening on http://localhost:3001`
+
+**Terminal 2 — Start Next.js UI** (port 3000):
+```bash
+npm run dev
+```
+Output should include: `- Local: http://localhost:3000`
+
+### Quick API Smoke Tests
+
+From a third terminal, verify endpoints:
+
+```bash
+# Health check
+powershell -Command "Invoke-WebRequest http://localhost:3001/api/health -UseBasicParsing | ConvertFrom-Json"
+
+# Login (returns JWT in Set-Cookie header)
+powershell -Command "@{email='admin@school.demo';password='demo123'} | ConvertTo-Json | Invoke-WebRequest -Uri http://localhost:3001/api/auth/login -Method POST -ContentType 'application/json' -UseBasicParsing | ConvertFrom-Json"
+
+# Events (requires auth cookie)
+powershell -Command "Invoke-WebRequest http://localhost:3001/api/events -UseBasicParsing | ConvertFrom-Json"
+```
+
+### UI Testing
+
+1. Open `http://localhost:3000` in browser.
+2. Follow the **Sections 3–12** of this checklist (Authentication, Student Flow, Approver Flow, etc.).
+
+### Troubleshooting
+
+- **"Cannot find module" errors**: Ensure relative imports in `src/server/` and `src/lib/` are correct. All imports should use relative paths (e.g., `../lib/db`).
+- **Environment variable errors**: Ensure `.env.local` is in the `school-ems-mvp/` folder and contains all required keys.
+- **Port already in use**: If port 3001 or 3000 is busy, update `EXPRESS_PORT` in `.env.local` or use `lsof -i :PORT` / `netstat -ano | findstr :PORT` to identify and stop conflicting processes.
+- **PowerShell curl security prompt**: Use `powershell -Command "Invoke-WebRequest -UseBasicParsing"` to suppress script execution warnings.
+
+### Optional: Single-Server Deployment (Future)
+
+A pre-built SPA client exists in `dist/client/` (built via `npm run build:client`). Express can serve it directly by building the client and then running the Express server alone on port 3001, which will serve both API and static UI. This is useful for production deployments.

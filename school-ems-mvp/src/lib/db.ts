@@ -1,5 +1,5 @@
 import mongoose from "mongoose";
-import { env } from "@/lib/env";
+import { env } from "./env";
 
 type MongooseCache = {
   conn: typeof mongoose | null;
